@@ -1,0 +1,612 @@
+---
+title: "Data Mining on Dota 2 Matches"
+author: "Tianyu Lu"
+date: "April 11, 2016"
+output: word_document
+---
+
+#Abstract
+
+_Dota (Defense of the Ancient) 2 is a combination of RTS including perspective and a heavy requirement of tactics and team co-ordination and RPG including itemization and leveling up. This paper applies different model to generate analysis of the skill stats in the match and draws a series conclusions to help players and teams to establish their strategy. In the future, with the result in this paper, it is possible to get a model for match predicting. The model can calculate a static score for the teams. And then, apply to statistical model._
+
+
+
+#Background
+Dota (Defense of the Ancient) 2 is a combination of RTS including perspective and a heavy requirement of tactics and team co-ordination and RPG including itemization and leveling up. Players are split into two competing teams (Radiant and Dire), each consisting of up to five players. The main objective in Dota 2 is to destroy the enemy Ancient inside their stronghold. These strongholds are protected by multiple towers down 3 lanes. The player controls a Hero, a strategically-powerful unit with unique abilities and characteristics, which fights for them and gains strength by leveling up and buying items with gold. Experience is earned when creeps and heroes die. Gold is gained passively over time, by killing creeps, by killing enemy heroes and by destroying buildings.
+
+Heroes are all unique characters within Dota 2. At the start of each game, players select a Hero from the Hero Pool. Heroes are split into 3 categories: strength, agility and intelligence. Dota 2 has currently implemented 111 of the 112 Heroes.
+
+It is a multiplayer online battle arena video game published by Valve Corporation. Every year Valve hosts a great electronic sports Dota 2 championship tournament: The International. It attracts many different players from all over the world, with a large prize pool (In 2015, it was $18 million). Also, millions of players played the game online every day. It is a team fight between two five-player teams, each of which occupies a stronghold in a corner of the map. Who destroy the Ancient on the other side wins the game. It has more than 100 heroes and complicated item system. So, for this big game, players need a data analysis report to guide them to play it well. All the teams need data mining process to see how to play against their opponent including which hero should be banned, which should be picked and how to make a strategy to form a hero group.
+Currently, teams has their data analyzer help to make a basic statistic on which hero has higher win rate and how to combine a strategy with hero picked in a game. They may also try to study their opponent's preference on hero selecting. But in whole Dota field, it lacks a deeper data mining with professional statistic methods applied in economy or other serious subject. Players always use their own feeling to pick hero in a match or just make a simple ban/pick strategy.  So, in this project, we will use machine learning method to find out those important factors and make a prediction for the match. In this way, if the result is satisfactory, it can generate a model for teams to build up their strategy when facing different opponents.
+
+#Data Collection and Description
+I collected match data from http://www.dotabuff.com/esports/matches. It contains the details of matches of the game and some important statistics such as damage, experience and gold of each hero. I picked the data only from recent esports games, so it reflects the high level skill players' strategy, which can give us more confident machine learning result. These matches are under the newest version of Dota 2 6.86f.
+
+The attribute information is shown as below:
+
+* 1.	Match ID - Describe the identification of the match.
+* 2.	Region - The match server location.
+* 3.	Duration - The time period of the match, excluding the ban/pick time.
+* 4.	Winner - Radiant or Dire.
+* 5.	Hero - The hero picked in the game.
+* 6.	K - For one hero, the number of enemy hero he kills in the game.
+* 7.	D - For one hero, the time he dies in the game.
+* 8.	A - For one hero, the time he assists to kill an enemy hero in the game.
+* 9.	XPM - The experience per minute of one hero.
+* 10.	GPM - The gold per minute of one hero.
+* 11.	DMG - The total damage of one hero deals in the game.
+
+(From 5 to 11, these numbers describe one hero's performance in a game. Since it has 10 heroes, 5 vs 5, in the match, we use number 1 to 10 to express each group of statistics of one hero. And 1 to 5 means radiant hero, whereas 6 to 10 dire.)
+
+#Algorithm and Model
+
+For the data, we are going to apply different algorithms to analyze what are the main factors that influence the match. Hence, we can draw conclusions of how to win the game and how to operate different kind heros.
+
+##0. Data Preprocessing
+
+The raw data lacks some hero in the game, so we should do some work to uniform the hero levels, which can help when we apply the hero analysis.
+
+```{r}
+dota.orgin <- read.csv(file = "D:/dotabuff.csv",header = T)
+summary(dota.orgin)
+
+
+lvl <- c("abaddon", "alchemist", "ancient-apparition", "anti-mage", "arc-warden", "axe" ,"bane",  "batrider" , "beastmaster", "bloodseeker", "bounty-hunter", "brewmaster", "bristleback", "broodmother", "centaur-warrunner", "chaos-knight", "chen", "clinkz", "clockwerk", "crystal-maiden", "dark-seer", "dazzle", "death-prophet", "disruptor", "doom", "dragon-knight", "drow-ranger", "earth-spirit", "earthshaker", "elder-titan", "ember-spirit",  "enchantress", "enigma",  "faceless-void", "gyrocopter",  "huskar", "invoker",  "io",  "jakiro",   "juggernaut",  "keeper-of-the-light", "kunkka", "legion-commander", "leshrac", "lich", "lifestealer", "lina", "lion", "lone-druid", "luna", "lycan", "magnus", "medusa", "meepo", "mirana", "morphling", "naga-siren",  "natures-prophet", "necrophos", "night-stalker",  "nyx-assassin",  "ogre-magi", "omniknight",  "oracle",   "outworld-devourer",  "phantom-assassin", "phantom-lancer", "phoenix",  "puck",     "pudge",    "pugna", "queen-of-pain", "razor", "riki",     "rubick",   "sand-king", "shadow-demon", "shadow-fiend", "shadow-shaman", "silencer", "skywrath-mage", "slardar", "slark", "sniper", "spectre",  "spirit-breaker", "storm-spirit", "sven", "techies", "templar-assassin", "terrorblade", "tidehunter",  "timbersaw", "tinker", "tiny", "treant-protector", "troll-warlord", "tusk", "undying",  "ursa", "vengeful-spirit", "venomancer",  "viper", "visage", "warlock", "weaver",   "windranger", "winter-wyvern", "witch-doctor", "wraith-king", "zeus")
+
+dota.orgin$Hero1 <- factor(as.character(dota.orgin$Hero1),levels = lvl)
+dota.orgin$Hero2 <- factor(as.character(dota.orgin$Hero2),levels = lvl)
+dota.orgin$Hero3 <- factor(as.character(dota.orgin$Hero3),levels = lvl)
+dota.orgin$Hero4 <- factor(as.character(dota.orgin$Hero4),levels = lvl)
+dota.orgin$Hero5 <- factor(as.character(dota.orgin$Hero5),levels = lvl)
+dota.orgin$Hero6 <- factor(as.character(dota.orgin$Hero6),levels = lvl)
+dota.orgin$Hero7 <- factor(as.character(dota.orgin$Hero7),levels = lvl)
+dota.orgin$Hero8 <- factor(as.character(dota.orgin$Hero8),levels = lvl)
+dota.orgin$Hero9 <- factor(as.character(dota.orgin$Hero9),levels = lvl)
+dota.orgin$Hero10 <- factor(as.character(dota.orgin$Hero10),levels = lvl)
+```
+
+
+##1. Logistic Resgression
+
+From basic observation, I want to try linear regression to find out which parameters affect the match result mostly. It is a simple model to observe the inner relationship of duration, KDA, experience and gold with the win rate. Basically, we think the game has rationship with all the factors, especially the kda and the gold they earn from enemy heroes and minions.
+
+###Data convertion
+First, we convert the data to numeric.
+
+```{r}
+#convert duration to numeric
+dota.orgin$Duration <- as.character(dota.orgin$Duration)
+shortformat <- "^[0-9]{2}:[0-9]{2}$"
+mark <- grep(shortformat,dota.orgin$Duration)
+for(i in mark){
+  dota.orgin$Duration[i] <- paste("00:",dota.orgin$Duration[i])
+}
+library(chron)
+duration <- chron(times = as.character(dota.orgin$Duration))
+class(duration)
+duration <- data.frame(matrix(unlist(strsplit(as.character(dota.orgin$Duration), split = ":")),ncol = 3,byrow = T))
+colnames(duration) <- c("hour","minute","second")
+minutes <- as.numeric(as.character(duration$hour))*60+as.numeric(as.character(duration$minute))
+
+#convert skill statistics to numeric format
+dota.parameters <- dota.orgin[,c(-1:-5,-11,-12,-18,-19,-25,-26,-32,-33,-39,-40,-46,-47,-53,-54,-60,-61,-67,-68,-74)]
+for(i in 1:50){
+dota.parameters[,i] <- as.numeric(as.character(dota.parameters[,i]))
+}
+dota.parameters <- cbind(Winner=dota.orgin$Winner,duration=minutes,dota.parameters)
+dota.parameters <- na.omit(dota.parameters)
+```
+
+###Logistic regression for all factors
+It is easily to run logistic regression model with all the parameters. But since the sum of statistics for Hero1 to Hero5 have collinearity with Hero6 to Hero10, we separate them into 2 groups to generate 2 models.
+
+```{r}
+dota.lm.radiant <- lm(as.numeric(Winner)~duration+
+                                K1+D1+A1+XPM1+GPM1+
+                                K2+D2+A2+XPM2+GPM2+
+                                K3+D3+A3+XPM3+GPM3+
+                                K4+D4+A4+XPM4+GPM4+
+                                K5+D5+A5+XPM5+GPM5
+                                #K6+D6+A6+XPM6+GPM6+
+                                #K7+D7+A7+XPM7+GPM7+
+                                #K8+D8+A8+XPM8+GPM8+
+                                #K9+D9+A9+XPM9+GPM9+
+                                #K10+D10+A10+XPM10+GPM10
+                                , data = dota.parameters)
+summary(dota.lm.radiant)
+
+dota.lm.dire <- lm(as.numeric(Winner)~duration+
+                                #K1+D1+A1+XPM1+GPM1+
+                                #K2+D2+A2+XPM2+GPM2+
+                                #K3+D3+A3+XPM3+GPM3+
+                                #K4+D4+A4+XPM4+GPM4+
+                                #K5+D5+A5+XPM5+GPM5+
+                                K6+D6+A6+XPM6+GPM6+
+                                K7+D7+A7+XPM7+GPM7+
+                                K8+D8+A8+XPM8+GPM8+
+                                K9+D9+A9+XPM9+GPM9+
+                                K10+D10+A10+XPM10+GPM10
+                                , data = dota.parameters)
+summary(dota.lm.dire)
+
+cbind(dota.lm.radiant$coefficients,dota.lm.dire$coefficients)
+```
+
+From this two linear model, we can know the duration and XPM are not significant to the win rate, though the skill numbers get larger when the game last longer. It is not a good model for us to anlysis, but anyway, at least we know the GPM and Death number are important. After comparing the coefficients of both side, I think the distribution of the skill statistics is not balance, for one hero from a certain side may get all the killings and earn much more gold than his teammates.
+
+To avoid this bias, we should add the numbers together to get the total number for each side.
+
+###Logistic regression for sums
+
+
+```{r}
+#the sum for radiant heroes
+Kradiant <- dota.parameters$K1+dota.parameters$K2+dota.parameters$K3+dota.parameters$K4+dota.parameters$K5
+Dradiant <- dota.parameters$D1+dota.parameters$D2+dota.parameters$D3+dota.parameters$D4+dota.parameters$D5
+Aradiant <- dota.parameters$A1+dota.parameters$A2+dota.parameters$A3+dota.parameters$A4+dota.parameters$A5
+Xradiant <- dota.parameters$XPM1+dota.parameters$XPM2+dota.parameters$XPM3+dota.parameters$XPM4+dota.parameters$XPM5
+Gradiant <- dota.parameters$GPM1+dota.parameters$GPM2+dota.parameters$GPM3+dota.parameters$GPM4+dota.parameters$GPM5
+#the sum for dire heroes
+Kdire <- dota.parameters$K6+dota.parameters$K7+dota.parameters$K8+dota.parameters$K9+dota.parameters$K10
+Ddire <- dota.parameters$D6+dota.parameters$D7+dota.parameters$D8+dota.parameters$D9+dota.parameters$D10
+Adire <- dota.parameters$A6+dota.parameters$A7+dota.parameters$A8+dota.parameters$A9+dota.parameters$A10
+Xdire <- dota.parameters$XPM6+dota.parameters$XPM7+dota.parameters$XPM8+dota.parameters$XPM9+dota.parameters$XPM10
+Gdire <- dota.parameters$GPM6+dota.parameters$GPM7+dota.parameters$GPM8+dota.parameters$GPM9+dota.parameters$GPM10
+
+dota.sum <- cbind(dota.parameters[,1:2],Kradiant,Dradiant,Aradiant,Xradiant,Gradiant,Kdire,Ddire,Adire,Xdire,Gdire)
+head(dota.sum)
+```
+
+Now we get the sum data frame for new linear regression models:
+
+```{r}
+dota.lm.radiant.sum <- lm(as.numeric(Winner)~duration+Kradiant+Dradiant+Aradiant+Xradiant+Gradiant,dota.sum)
+summary(dota.lm.radiant.sum)
+dota.lm.dire.sum <- lm(as.numeric(Winner)~duration+Kdire+Ddire+Adire+Xdire+Gdire,dota.sum)
+summary(dota.lm.dire.sum)
+```
+From this two models, we get the knowledge that only KDA and GPM are important for a match. Now, we have confidence to eliminate duration and XPM from the model:
+
+```{r}
+dota.lm.radiant.sum.reduced <- lm(as.numeric(Winner)~Dradiant+Aradiant+Gradiant,dota.sum)
+summary(dota.lm.radiant.sum.reduced)
+dota.lm.dire.sum.reduced <- lm(as.numeric(Winner)~Ddire+Adire+Gdire,dota.sum)
+summary(dota.lm.dire.sum.reduced)
+cbind(dota.lm.radiant.sum.reduced$coefficients,dota.lm.dire.sum.reduced$coefficients)
+```
+
+###Final logistic regression model
+
+In the final model for either radiant or dire, we can see the most significant factors are Death, Assistance and GPM. The coefficients are opposite number pairs, which indicates that the result of the game are very fair.
+
+Further, we are curious about whay if we put the factors together for both side.
+
+```{r}
+dota.lm <- lm(as.numeric(Winner)~Kradiant+Kdire+Dradiant+Ddire+Aradiant+Adire+Gradiant+Gdire,dota.sum)
+summary(dota.lm)
+dota.lm <- lm(as.numeric(Winner)~Dradiant+Ddire+Aradiant+Adire+Gradiant+Gdire,dota.sum)
+summary(dota.lm)
+dota.lm <- lm(as.numeric(Winner)~Aradiant+Adire+Gradiant+Gdire,dota.sum)
+summary(dota.lm)
+```
+
+After reduced, the linear model falls to only 4 factors: Assistance and GPM of both sides. Acutally, it can be concluded as two factors, the differences of assistance and GPM, since we have opposite numbers as the coefficients. It is surprising to find the killing and death numbers are not so important we they are put together. This might because they have strong collinearity.
+
+Anyway, we eventually get a model to describe the winner of the game which has an acceptable Adjusted $R^2$ and low p-value for all the coefficients. F-test also shows the model does well in total. The model can explain more than 79% of the variance. We can estimate this model, when extended to larger samples, will probably get a high accuracy.
+
+###Conclusion
+The model we get from logistic regression fits our expectation on somewhere and also brings us some surprise. The assistance looks like more important than the killing and death. This result, in some extent, suggests the players join combat more to assistant their teammates and farm more money for the whole team. In the game, it is hard to do both of farming money and joining the battle. The team who can get the balance of this two factors will have higer probability to win the game.
+
+Also, the intercept of the model shows that the game is quite fair for both sides, because the intercepts is almost at the center of 1 and 2 which presents the numeric position for Radiant and Dire.
+
+The model still has some inaccurate part. What we consider next is how they conform these factors. Do they have inner connections or public components in different fators? We can use Principal Components Analysis to get more information.
+
+
+##2. Principal Components Analysis
+
+In PCA process, we care more about what are the main factors that influence the data. It is probably separated into two sets: Radiant and Dire. PCA is good for us to comprehense how a factor weights in the model. 
+
+###PCA for all factors
+First, we apply the PCA for all numbers in dota.parameters to get a general impression of the data.
+
+```{r}
+library(psych)
+dota.fit <- prcomp(dota.parameters[,-1], retx=TRUE, center=TRUE, scale.=TRUE)
+summary(dota.fit)
+screeplot(dota.fit)
+plot(cumsum(dota.fit$sdev^2)/sum(dota.fit$sdev^2),ylim=c(0,1))
+```
+
+As expected, the first two components are large and share close weight. It indicates that there are important factors can influence the result strongly. Also, the screeplot and the summary show the variance value of the result. from which we can see the first 11 components explains 80% of the variance we want to retain.
+
+For the same reason, the separated elements of heroes skill statistics cannot behave a balance model in all. We are curious about what the sum say in the data.
+
+###PCA for sums
+
+```{r}
+dota.fit.sum <- prcomp(dota.sum[,-1], retx=TRUE, center=TRUE, scale.=TRUE)
+dota.fit.sum
+summary(dota.fit.sum)
+screeplot(dota.fit.sum)
+```
+
+Now, the sums do a great improvement to the model that first two components explain more than 85% of the variance. It is a very good sign when we want to reduce the factors. Also, we notice that this two components have close standard deviation and proportion of variance. It is like what we predicted before the test, they are probably the performance of Radiant and Dire teams.
+
+To prove this view, we can make a comparison of the coefficients of the two components.
+
+```{r}
+sort(dota.fit.sum$rotation[,1])
+sort(dota.fit.sum$rotation[,2])
+sort(abs(dota.fit.sum$rotation[,1]))
+sort(abs(dota.fit.sum$rotation[,2]))
+```
+
+From the sort of the abstract value of the rotation, the order of these factors is very interesting. We can see similar orders of PC1 and opposite PC2 and close values for Radiant in PC1 against Dire in PC2. It means they are orthogonal and function importantly. 
+
+From my own guess:
+
+PC1 is mostly influenced by killings and assistance in the game. It reflects how a team performanced in the match which can be explained as their positiveness in this game.
+
+PC2, on the opposite, is almost negative estimates, and the largest coefficients are deaths. This component shows their opponent's performance, or their mistakes in the game. So, I call this factor negativeness of the team.
+
+This discovery is helpful. It removes out other noise from the match. If we use the coefficients to weight of these numbers for a team, we can easily tell them how should perform to get a balance strategy in game and how can they beat their opponents by analyzing enemies' skill characteristics.
+
+###Biplot
+
+```{r}
+biplot(dota.fit)
+biplot(dota.fit.sum)
+```
+
+In the biplot, it is very clear to see the orthogonality of PC1 and PC2. Another interesting thing is the duration, no matter in dota.fit or dota.fit.sum, it locates on the center of the two components. It is a indirect proof for our guess that each PC1 and PC2 presents one side of the game.
+
+
+###Conclusion
+PCA analysis is not a clear supervised learning, so we cannot give a certain conclusion of what the components are. But we can still dig out some data traits from all factors. When we get the ingrediants of the main components, the next step is to compose the principal components with the coefficients. With them, it is easy to analyze the teams and players' behavior. And it can be a criteria to guide them.
+
+
+##3. Cluster Analysis
+
+###K-means
+
+First use k-means and examine the centers.
+
+Since we have two results of the match, it is reasonable to set k=2 for clustering.
+
+
+```{r}
+library(cluster)
+k<-2
+dota.k<-kmeans(dota.parameters[,-1],k)
+dota.k$centers
+```
+
+As above, these centers show symetricity for Radiant and Dire if we compare K1 and K6, D1 and D6 etc. in the two clusters.
+
+We can compare the k-means clustering with the winner of the game, the result can shows that the clustering in some extent present who wins the game.
+
+```{r}
+table(dota.parameters$Winner,dota.k$cluster)
+```
+
+The k-means clustering get a (455+469)/966=95.65% correct rate. However, it is not that useful if we recognize it is a review of the game rather than a prediction. If we get the stats of the game, it is not meaningful to infer the result from it. 
+
+What we care most here is the prediction of the game. It is rather tough to achieve. A further discussion will be illustrated in SVM model.
+
+```{r}
+sos <- (nrow(dota.sum[,-1])-1)*sum(apply(dota.sum[,-1],2,var))
+for (i in 2:10) sos[i] <- sum(kmeans(dota.sum[,-1], centers=i)$withinss)
+plot(1:10, sos, type="b", xlab="Number of Clusters", ylab="Sum of Squares")
+library(useful)
+best<-FitKMeans(dota.sum[,-1],max.clusters=10, seed=111)
+PlotHartigan(best)
+k<-5
+dota.k.sum<-kmeans(dota.sum[,-1],k)
+dota.k.sum$centers
+```
+
+
+But we can use larger k for clustering. The Hartigan graph shows that using k=5 is a good number for clustering. Though the result is hard to explicitly explain, we can still name them as short match(one side overwhelming) and long match(well-matched). Based on the duration centers, we can conclude the 25 minutes clusters are short games winned by both sides; 38, longer matches and 46, longest games. It indicates if the game duration is over 46 minutes, it is hard to predict who wins.
+
+###Conclusion
+The Clustering analysis indicates that the game result can be predicted by technical statistics. If we gather player's match data and use an algorithm to get his average performance in a match, we can generate predictions before the game. 
+
+
+##4. Elastic Net Model
+
+Since we do not only care the winner, but also the duration. It is meaningful to see how can the stats of teams determine the duration. Here, we can use lasso and ridge regression for the test.
+
+Actually, the XPM and GPM cannot affect the duration strongly, since they are already diveded by time(per minute). And the kill number of Dire equals the death number of radiant. So we can remove the Kdire, Ddire and XPM and GPM for both sides.
+
+###Set up the train and test sample
+```{r}
+set.seed(1013)
+train <- sample(1:nrow(dota.sum),nrow(dota.sum)/2)
+test <- (-train)
+in_sample <- dota.sum[train,]
+out_sample <- dota.sum[test,]
+trainx <- as.matrix(in_sample[,c(3:5,10)])
+trainy <- in_sample$duration
+testx <- as.matrix(out_sample[,c(3:5,10)])
+testy <- out_sample$duration
+```
+
+###Lasso and ridge regression
+
+```{r}
+library(glmnet)
+lambdalevels <- 10^seq(7,-2,length=100)
+dota.cv.mod<-NULL
+bestlambda<-NULL
+yhat<-NULL
+mse<-NULL
+i<-0
+for(a in seq(0,1,0.1)){
+  i<-i+1
+  dota.cv.mod[[i]]=cv.glmnet(trainx,trainy,alpha=a,lambda=lambdalevels)
+  bestlambda[i] <- dota.cv.mod[[i]]$lambda.min
+  yhat[[i]] <- predict(dota.cv.mod[[i]]$glmnet.fit, s=dota.cv.mod[[i]]$lambda.min, newx=trainx)
+  mse[i] <- sum((trainy - yhat[[i]])^2)/nrow(trainx)
+}
+mse
+best<-order(mse)[1]
+best
+bestalpha<-(best-1)*0.1
+bestalpha
+bestlambdafinal<-bestlambda[best]
+bestlambdafinal
+#so, the best alpha is 1, best lambda is 0.01
+mod=glmnet(trainx,trainy,alpha=bestalpha,lambda=lambdalevels)
+coef(mod)[,100]
+plot(mod,xvar="lambda")
+```
+
+
+We can use $R^2$ to evaluate the model:
+
+```{r}
+yhat.test <- predict(dota.cv.mod[[best]]$glmnet.fit, s=bestlambdafinal, newx=testx)
+mse.test <- sum((testy - yhat.test)^2)/nrow(testx)
+mse.test
+tss <- sum((testy - mean(testy))^2)
+sse <- sum((testy - yhat.test)^2)
+r2 <- (tss - sse) / tss
+r2
+```
+
+This result is acceptable, but not very good in predicting the duration. It explains about 60% of the variance here.
+
+The coefficients are shown as below:
+
+```{r}
+predict(mod, type="coefficients",s=bestlambdafinal)
+```
+
+###Conclusion
+It seems the game will always last longer than 10 minutes and can be predicted by the skill stats.
+
+With the increasing of the time, according to the model, the death number and assistance number grow gradually. It, in some extent, is a indicator in evaluating a team's performance in future.
+
+##5. Support Vector Machine
+
+###Set up the train and test sample
+```{r}
+library(e1071)
+library(kernlab)
+trainset <- dota.sum[train,]
+trainx <- dota.sum[train,-1]
+trainy <- dota.sum[train,1]
+testx <- dota.sum[test,-1]
+testy <- dota.sum[test,1]
+```
+
+
+###Choosing kernel
+Radial kernel
+```{r}
+costvalues <- 10^seq(-3,2,1)
+tuned.svm <- tune(svm, Winner~., data=trainset, ranges=list(cost=costvalues), kernel="radial")
+summary(tuned.svm)
+#the best performance is when we set cost as 1, we get 5% of the points incorrectly classified.
+svmfit <- svm(Winner~. , kernel = "radial",cost = 100,data=trainset)
+summary(svmfit)
+```
+
+Linear kernel
+```{r}
+tuned.svm <- tune(svm, Winner~., data=trainset, ranges=list(cost=costvalues), kernel="linear")
+summary(tuned.svm)
+#the best cost is 1, where we get only 4.2% is wrong
+svmfit <- svm(Winner~. , kernel = "linear",cost = 1,data=trainset)
+summary(svmfit)
+```
+
+Polynomial kernel
+```{r}
+tuned.svm <- tune(svm, Winner~., data=trainset, ranges=list(cost=costvalues), kernel="polynomial")
+summary(tuned.svm)
+
+#the best cost is 100, where we get only 4.2% is wrong
+svmfit <- svm(Winner~. , kernel = "polynomial",cost = 100,data=trainset)
+summary(svmfit)
+```
+
+Sigmoid kernel
+```{r}
+tuned.svm <- tune(svm, Winner~., data=trainset, ranges=list(cost=costvalues), kernel="sigmoid")
+summary(tuned.svm)
+#the best cost is 0.1, where we get only 4.2% is wrong
+svmfit <- svm(Winner~. , kernel = "sigmoid",cost = 0.1,data=trainset)
+summary(svmfit)
+```
+
+###Prediction for test samples
+It seems that the linear kernel gives the best result. So, we use linear kernel to test the out-sample.
+
+```{r}
+prediction <- predict(tuned.svm$best.model,testx)
+table(prediction,truth=testy)
+sum(yhat==testy)/length(testy)
+```
+
+The SVM is satifactory, a high correct rate more than 97% is a very excellent result in statistics.
+
+###Conclusion
+In SVM model, we tested different kernals and costs for the dataset. It gives a very good response with almost 95% correct to the test data. This result may indicates that the SVM is a good tool to analyze or predict matches with enough number of samples. The statistical points of the players in dota can truely show the trend of the game. With the different method of kernel, SVM can easily do classification work in different dataset, especially when we cannot summary the trait of the data in lower dimension. Also, if we want to improve the performance, choosing the right parameters and the model is important. And maybe changing the scale of the data can help to make a better result.
+
+##6. Assosiation Rule
+
+###Set up transactions
+
+```{r}
+library(arules)
+library(arulesViz)
+dota.tran <- as(dota.orgin[,c(4,5,12,19,26,33,40,47,54,61,68)],"transactions")
+summary(dota.tran)
+inspect(dota.tran[1:3])
+itemFrequency(dota.tran[, 1:10])
+```
+
+###Finding raw rules
+
+It is very difficult to find rules in small sample data like this, the support is not high enough to form big set.
+
+```{r}
+rule.dota <- apriori(dota.tran, parameter = list(support=0.005, confidence=0.7, minlen=3))
+summary(rule.dota)
+inspect(rule.dota)
+```
+
+###Conclusion
+These rules are very interesting and valueble. For example,
+
+{Hero6=zeus,Hero7=spectre} => {Winner=Dire} 
+
+This rule shows that when dire get zeus and spectre together, they can win the game in a high expectation. It is a known rule for players called universal strategy since both zeus and spectre have skill can hit enemies whereever they are. It proves that the rule analysis fits the realistic strategy, thus we can use rules we do not know from the set.
+
+If we have more samples, we can generate more rules for the game which can guide the players in a large range and help them accumalate tips against their opponents.
+
+By decreasing the support, we can get more rules:
+
+```{r}
+rule.dota <- apriori(dota.tran, parameter = list(support=0.003, confidence=0.7, minlen=3))
+summary(rule.dota)
+inspect(sort(rule.dota, by = "lift")[1:10])
+
+rulesdataframe<- as(rule.dota, "data.frame")
+subset.matrix <- is.subset(rule.dota, rule.dota)
+subset.matrix[lower.tri(subset.matrix, diag=T)] <- NA
+redundant <- colSums(subset.matrix, na.rm=T) >= 1
+rules.pruned <- rule.dota[!redundant]
+summary(rules.pruned)
+inspect(sort(rules.pruned[1:10],by = "lift"))
+```
+
+##7. More Analysis on Heroes
+
+Aside matches, we can do more analysis on heroes with these algorithms and models
+
+###Preprocessing
+
+```{r}
+hero <- NULL
+for(i in seq(5,68,7)){
+heroseq <- dota.orgin[,i:(i+6)]
+colnames(heroseq) <- c("Hero","K","D","A","XPM","GPM","DMG")
+hero <- rbind(hero,heroseq)
+}
+for(i in 2:6){
+  hero[,i]<-as.numeric(hero[,i])
+}
+damage<-sub("k","",as.character(hero$DMG))
+damage <- 1000*as.numeric(damage)
+hero.parameters <- cbind(hero[,-7],DMG=damage)
+head(hero.parameters)
+```
+
+
+###Win rate stats
+
+```{r}
+result <- NULL
+for(i in 1:nrow(dota.orgin)){
+  if(dota.orgin[i,4]=="Dire"){
+    radiant.result <- rep("lose",5)
+    dire.result <- rep("win",5)
+  }
+  else{
+    radiant.result <- rep("win",5)
+    dire.result <- rep("lose",5)
+  }
+  result <- c(result,radiant.result,dire.result)
+}
+
+hero.win <- cbind(hero.parameters,result)
+
+table(hero.win$Hero,hero.win$result)
+hero.wintable <- data.frame(table(hero.win$Hero,hero.win$result))
+lose <- hero.wintable[1:111,]
+win <- hero.wintable[112:222,]
+hero.winrate <- cbind(lose[,-2],win[,3])
+hero.winrate <- cbind(hero.winrate,hero.winrate[,2]+hero.winrate[,3])
+hero.winrate <- cbind(hero.winrate,hero.winrate[,3]/hero.winrate[,4])
+colnames(hero.winrate) <- c("Hero","Lose","Win","Total","WinRate")
+
+hero.winrate[order(hero.winrate$WinRate,decreasing = T),c(1,5,4)]
+herotemp <- hero.winrate[order(hero.winrate$WinRate,decreasing = T),c(1,5,4)]
+subset(herotemp,herotemp$WinRate>=0.5&herotemp$Total>=80)
+```
+
+By displaying the table, we can find the heroes with higher win rate with large number of matches. Those are the heroes fit for the current version of the game.
+
+###Linear Model
+
+```{r}
+hero.parameters <- na.omit(hero.parameters)
+hero.parameters <- subset(hero.parameters,DMG<50000)
+hero.lm <- lm(as.numeric(Hero)~.,hero.parameters)
+summary(hero.lm)
+```
+
+From the result, we know it is hard to regress the data with linear model, which means the stats of different heroes are very close to each other. We may want to cluster these heroes into several sets.
+
+###K-means
+
+Since we have 5 position for a team, so we choose k=5
+
+```{r}
+k <- 5
+hero.k <- kmeans(hero.parameters[,-1],k)
+hero.k$centers
+table(hero.parameters$Hero,hero.k$cluster)
+```
+
+It is very clear with the centers of clusters that the heroes' stats can be divided into different classes which represent different positions in a team. 2 carries, 1 control and 2 supports. This classification is significant with KDA, XPM, GPM as well as Damage. All factors have obvious difference.
+
+
+#Future Research Discussion
+
+The whole result of the project is acceptable. From different perspective with these model, we get some interesting analysis of the Dota 2 game. It can generate speicific strategies for teams and common players of how to select heroes and how to behave in a match.
+
+According to the conclusion we get above, the future task of our research is the prediction of a match for two certain teams. We can separate this process into 2 questions:
+
+(1). The prediction with certain teams before match.
+
+(2). The prediction with certain teams after ban/pick.
+
+The difference is whether we know the hero build of one match.
+
+In fact, in my view, with the result we get in logistic regression, elastic net model and SVM, it is optimistic to get a model for match predicting. The next step is to collect professional player's information such as which hero he play often and what is his performance. With the average behavior of all team players, we can calculate the static score for the team. When two teams meet, we can put their past match results in a model to generate a fix coefficient for this score. And then, we use this score or the set of stats to apply our regression or SVM model. The computer will tell us who has higher probablity to win the game eventually. For my own estimation, this model may get about 60% to 65% accuracy. It is quite high in a e-sport bet.
+
+
+#References
+1. War and Picks http://www.datdota.com/blog/?p=1323
+
+2. Analysis of the Time Aspect of the Matches at The International 3 (Dota 2 Tournament)
+http://www.r-bloggers.com/analysis-of-the-time-aspect-of-the-matches-at-the-international-3-dota-2-tournament/
+
+3. Result Prediction by Mining Replays in Dota 2
+https://www.diva-portal.org/smash/get/diva2:829556/FULLTEXT01.pdf
+
+4. Identifying Patterns in Combat that are Predictive of Success in MOBA Games http://ciigar.csc.ncsu.edu/files/bib/Yang2014-MOBASucessPatterns.pdf
+
